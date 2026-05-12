@@ -5,9 +5,10 @@ namespace Dictionary.DataStructures
     public class BPlusTreeStorage : IStorageEngine
     {
         private const int M = 64;
-        private Node _root;
+        private Node Root;
         private int _count;
-        private Node _firstLeaf;
+        private Node FirstLeaf;
+        public long TotalNodeAccessCount = 0;
 
         public int Count => _count;
 
@@ -48,9 +49,10 @@ namespace Dictionary.DataStructures
 
         public void Clear()
         {
-            _root = new Node(true);
-            _firstLeaf = _root;
+            Root = new Node(true);
+            FirstLeaf = Root;
             _count = 0;
+            TotalNodeAccessCount = 0;
         }
 
 
@@ -58,21 +60,26 @@ namespace Dictionary.DataStructures
         {
             if (string.IsNullOrEmpty(word)) return null;
 
-
+            long currentAccess = 0;
             string key = word.ToLower();
-            Node leaf = FindLeaf(_root, key);
+            Node leaf = FindLeaf(Root, key, ref currentAccess);
 
-            int pos = BinarySearchExact(leaf, key);
-            if (pos >= 0) return leaf.Entries[pos];
+            int pos = BinarySearchExact(leaf, key, ref currentAccess);
+            if (pos >= 0)
+            {
+                TotalNodeAccessCount += currentAccess;
+                return leaf.Entries[pos];
+            }
 
+            TotalNodeAccessCount += currentAccess;
             return null;
         }
 
-        private Node FindLeaf(Node node, string key)
+        private Node FindLeaf(Node node, string key, ref long accessCount)
         {
             while (!node.IsLeaf)
             {
-
+                accessCount++;
                 int left = 0, right = node.KeyCount - 1;
                 int i = 0;
 
@@ -91,8 +98,9 @@ namespace Dictionary.DataStructures
             return node;
         }
 
-        private int BinarySearchExact(Node leaf, string key)
+        private int BinarySearchExact(Node leaf, string key, ref long accessCount)
         {
+            accessCount++;
             int left = 0, right = leaf.KeyCount - 1;
             while (left <= right)
             {
@@ -111,22 +119,25 @@ namespace Dictionary.DataStructures
             var results = new List<DictionaryEntry>();
             if (string.IsNullOrEmpty(prefix)) return results;
 
+            long currentAccess = 0;
             string lowerPrefix = prefix.ToLower();
             int prefixLen = lowerPrefix.Length;
 
-
-            Node current = FindLeaf(_root, lowerPrefix);
-            if (current == null) return results;
-
+            Node current = FindLeaf(Root, lowerPrefix, ref currentAccess);
+            if (current == null)
+            {
+                TotalNodeAccessCount += currentAccess;
+                return results;
+            }
 
             while (current != null)
             {
+                currentAccess++;
                 bool foundAny = false;
 
                 for (int i = 0; i < current.KeyCount; i++)
                 {
                     string key = current.Keys[i];
-
 
                     if (key.Length >= prefixLen &&
                         string.Compare(key, 0, lowerPrefix, 0, prefixLen, StringComparison.Ordinal) == 0)
@@ -136,13 +147,14 @@ namespace Dictionary.DataStructures
                     }
                     else if (foundAny)
                     {
-
+                        TotalNodeAccessCount += currentAccess;
                         return results;
                     }
                 }
 
                 current = current.Next;
             }
+            TotalNodeAccessCount += currentAccess;
             return results;
         }
         public void Insert(DictionaryEntry entry)
@@ -154,19 +166,20 @@ namespace Dictionary.DataStructures
             Node newNode;
             string upKey;
 
-            InsertInternal(_root, key, entry, out upKey, out newNode, ref isNew);
+            InsertInternal(Root, key, entry, out upKey, out newNode, ref isNew);
 
             if (newNode != null)
             {
                 Node newRoot = new Node(false);
                 newRoot.Keys[0] = upKey;
-                newRoot.Children[0] = _root;
+                newRoot.Children[0] = Root;
                 newRoot.Children[1] = newNode;
                 newRoot.KeyCount = 1;
-                _root = newRoot;
+                Root = newRoot;
             }
 
             if (isNew) _count++;
+            TotalNodeAccessCount++;
         }
 
         private void InsertInternal(Node node, string key, DictionaryEntry entry, out string upKey, out Node newNode, ref bool isNew)
@@ -278,9 +291,10 @@ namespace Dictionary.DataStructures
         {
             if (string.IsNullOrEmpty(word)) return;
             string key = word.ToLower();
-            Node leaf = FindLeaf(_root, key);
+            Node leaf = FindLeaf(Root, key, ref TotalNodeAccessCount);
 
-            int pos = BinarySearchExact(leaf, key);
+            long currentAccess = 0;
+            int pos = BinarySearchExact(leaf, key, ref currentAccess);
             if (pos >= 0)
             {
                 for (int i = pos; i < leaf.KeyCount - 1; i++)
@@ -293,6 +307,7 @@ namespace Dictionary.DataStructures
                 leaf.Entries[leaf.KeyCount - 1] = null;
                 leaf.KeyCount--;
                 _count--;
+                TotalNodeAccessCount += currentAccess;
             }
         }
 
@@ -301,7 +316,7 @@ namespace Dictionary.DataStructures
         // ==========================================
         public IEnumerable<DictionaryEntry> GetAll()
         {
-            Node current = _firstLeaf;
+            Node current = FirstLeaf;
             while (current != null)
             {
                 for (int i = 0; i < current.KeyCount; i++)

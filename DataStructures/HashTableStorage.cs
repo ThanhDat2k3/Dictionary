@@ -1,37 +1,54 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Dictionary.Models;
 
 namespace Dictionary.DataStructures
 {
     public class HashTableStorage : IStorageEngine
     {
-        private Dictionary<string, DictionaryEntry> _table;
+        private Dictionary<string, DictionaryEntry> Table;
+        private long TotalNodeAccessCount = 0;
 
-        public int Count => _table.Count;
+        public int Count => Table.Count;
 
         public HashTableStorage()
         {
-            _table = new Dictionary<string, DictionaryEntry>(StringComparer.OrdinalIgnoreCase);
+            Table = new Dictionary<string, DictionaryEntry>(StringComparer.OrdinalIgnoreCase);
         }
 
         public void Insert(DictionaryEntry entry)
         {
             if (entry != null)
             {
-                _table[entry.Word] = entry;
+                TotalNodeAccessCount++;
+                Table[entry.Word] = entry;
             }
         }
 
         public DictionaryEntry Search(string word)
         {
-            return _table.ContainsKey(word) ? _table[word] : null;
+            long currentAccess = 0;
+            var result = SearchInternal(word, ref currentAccess);
+            TotalNodeAccessCount += currentAccess;
+            return result;
+        }
+
+        private DictionaryEntry SearchInternal(string word, ref long accessCount)
+        {
+            accessCount++;
+            return Table.ContainsKey(word) ? Table[word] : null;
         }
 
         public List<DictionaryEntry> SearchPrefix(string prefix)
         {
-            return _table
+            long currentAccess = 0;
+            var results = SearchPrefixInternal(prefix, ref currentAccess);
+            TotalNodeAccessCount += currentAccess;
+            return results;
+        }
+
+        private List<DictionaryEntry> SearchPrefixInternal(string prefix, ref long accessCount)
+        {
+            accessCount++;
+            return Table
                 .Where(x => x.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 .Select(x => x.Value)
                 .OrderBy(x => x.Word, StringComparer.OrdinalIgnoreCase)
@@ -40,17 +57,19 @@ namespace Dictionary.DataStructures
 
         public void Delete(string word)
         {
-            _table.Remove(word);
+            TotalNodeAccessCount++;
+            Table.Remove(word);
         }
 
         public void Clear()
         {
-            _table.Clear();
+            Table.Clear();
+            TotalNodeAccessCount = 0;
         }
 
         public IEnumerable<DictionaryEntry> GetAll()
         {
-            return _table.Values;
+            return Table.Values;
         }
     }
 }

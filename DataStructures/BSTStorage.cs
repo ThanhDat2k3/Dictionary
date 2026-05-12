@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Dictionary.Models;
 
 namespace Dictionary.DataStructures
@@ -20,8 +17,9 @@ namespace Dictionary.DataStructures
             }
         }
 
-        private AVLNode _root;
+        private AVLNode Root;
         private int _count;
+        public long TotalNodeAccessCount = 0;
 
         public int Count => _count;
 
@@ -30,8 +28,9 @@ namespace Dictionary.DataStructures
             if (entry != null)
             {
                 bool isNew = false;
-                _root = InsertNode(_root, entry, ref isNew);
+                Root = InsertNode(Root, entry, ref isNew);
                 if (isNew) _count++;
+                TotalNodeAccessCount++;
             }
         }
 
@@ -66,20 +65,23 @@ namespace Dictionary.DataStructures
 
         public DictionaryEntry Search(string word)
         {
-            var node = SearchNode(_root, word);
+            long currentAccess = 0;
+            var node = SearchNode(Root, word, ref currentAccess);
+            TotalNodeAccessCount += currentAccess;
             return node?.Entry;
         }
 
-        private AVLNode SearchNode(AVLNode node, string word)
+        private AVLNode SearchNode(AVLNode node, string word, ref long accessCount)
         {
             if (node == null)
                 return null;
 
+            accessCount++;
             int cmp = string.Compare(word, node.Entry.Word, StringComparison.OrdinalIgnoreCase);
             if (cmp < 0)
-                return SearchNode(node.Left, word);
+                return SearchNode(node.Left, word, ref accessCount);
             else if (cmp > 0)
-                return SearchNode(node.Right, word);
+                return SearchNode(node.Right, word, ref accessCount);
             else
                 return node;
         }
@@ -87,15 +89,18 @@ namespace Dictionary.DataStructures
         public List<DictionaryEntry> SearchPrefix(string prefix)
         {
             var results = new List<DictionaryEntry>();
-            SearchPrefixNode(_root, prefix, results);
+            long currentAccess = 0;
+            SearchPrefixNode(Root, prefix, results, ref currentAccess);
+            TotalNodeAccessCount += currentAccess;
             return results.OrderBy(x => x.Word, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private void SearchPrefixNode(AVLNode node, string prefix, List<DictionaryEntry> results)
+        private void SearchPrefixNode(AVLNode node, string prefix, List<DictionaryEntry> results, ref long accessCount)
         {
             if (node == null)
                 return;
 
+            accessCount++;
             if (node.Entry.Word.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 results.Add(node.Entry);
@@ -103,17 +108,18 @@ namespace Dictionary.DataStructures
 
             int cmp = string.Compare(prefix, node.Entry.Word, StringComparison.OrdinalIgnoreCase);
             if (cmp <= 0)
-                SearchPrefixNode(node.Left, prefix, results);
+                SearchPrefixNode(node.Left, prefix, results, ref accessCount);
             if (cmp >= 0)
-                SearchPrefixNode(node.Right, prefix, results);
+                SearchPrefixNode(node.Right, prefix, results, ref accessCount);
         }
 
         public void Delete(string word)
         {
             int countBefore = _count;
-            _root = DeleteNode(_root, word);
+            Root = DeleteNode(Root, word);
             if (_count < countBefore)
                 _count--;
+            TotalNodeAccessCount++;
         }
 
         private AVLNode DeleteNode(AVLNode node, string word)
@@ -225,14 +231,15 @@ namespace Dictionary.DataStructures
 
         public void Clear()
         {
-            _root = null;
+            Root = null;
             _count = 0;
+            TotalNodeAccessCount = 0;
         }
 
         public IEnumerable<DictionaryEntry> GetAll()
         {
             var results = new List<DictionaryEntry>();
-            InOrder(_root, results);
+            InOrder(Root, results);
             return results;
         }
 
